@@ -1,0 +1,181 @@
+// Expected DBML output for the sample MySQL schema
+// This shows what the converter should generate
+
+Project sample_ecommerce {
+  database_type: 'MySQL'
+  Note: 'Generated from MySQL CREATE TABLE statements'
+}
+
+Table users {
+  id int [pk, increment]
+  username varchar(50) [not null, unique]
+  email varchar(255) [not null, unique]
+  password_hash varchar(255) [not null]
+  first_name varchar(100)
+  last_name varchar(100)
+  date_of_birth date
+  is_active boolean [default: true]
+  created_at timestamp [default: `CURRENT_TIMESTAMP`]
+  updated_at timestamp [default: `CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP`]
+
+  indexes {
+    idx_username [name: 'idx_username']
+    idx_email [name: 'idx_email']
+    idx_created_at [name: 'idx_created_at']
+  }
+
+  Note: 'User accounts table'
+}
+
+Table categories {
+  id int [pk, increment]
+  name varchar(100) [not null, unique]
+  description text
+  parent_id int
+  created_at timestamp [default: `CURRENT_TIMESTAMP`]
+
+  indexes {
+    idx_parent_id [name: 'idx_parent_id']
+  }
+
+  Note: 'Product categories'
+}
+
+Table products {
+  id int [pk, increment]
+  name varchar(255) [not null]
+  description text
+  price decimal(10,2) [not null]
+  cost decimal(10,2)
+  sku varchar(50) [unique]
+  category_id int [not null]
+  stock_quantity int [default: 0]
+  is_active boolean [default: true]
+  created_at timestamp [default: `CURRENT_TIMESTAMP`]
+  updated_at timestamp [default: `CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP`]
+
+  indexes {
+    idx_category_id [name: 'idx_category_id']
+    idx_sku [name: 'idx_sku']
+    idx_price [name: 'idx_price']
+    (name, category_id) [name: 'idx_name_category']
+  }
+
+  Note: 'Product catalog'
+}
+
+Table orders {
+  id int [pk, increment]
+  user_id int [not null]
+  order_number varchar(50) [not null, unique]
+  status varchar [default: 'pending', note: 'ENUM: pending, processing, shipped, delivered, cancelled']
+  total_amount decimal(12,2) [not null]
+  shipping_address text
+  billing_address text
+  payment_method varchar(50)
+  notes text
+  created_at timestamp [default: `CURRENT_TIMESTAMP`]
+  updated_at timestamp [default: `CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP`]
+  shipped_at timestamp
+  delivered_at timestamp
+
+  indexes {
+    idx_user_id [name: 'idx_user_id']
+    idx_order_number [name: 'idx_order_number']
+    idx_status [name: 'idx_status']
+    idx_created_at [name: 'idx_created_at']
+    (user_id, status) [name: 'idx_user_status']
+  }
+
+  Note: 'Customer orders'
+}
+
+Table order_items {
+  id int [pk, increment]
+  order_id int [not null]
+  product_id int [not null]
+  quantity int [not null, default: 1]
+  unit_price decimal(10,2) [not null]
+  total_price decimal(12,2) [not null]
+  created_at timestamp [default: `CURRENT_TIMESTAMP`]
+
+  indexes {
+    idx_order_id [name: 'idx_order_id']
+    idx_product_id [name: 'idx_product_id']
+    (order_id, product_id) [unique, name: 'idx_order_product']
+  }
+
+  Note: 'Items within orders'
+}
+
+Table reviews {
+  id int [pk, increment]
+  user_id int [not null]
+  product_id int [not null]
+  rating int [not null, note: 'CHECK: rating >= 1 AND rating <= 5']
+  title varchar(255)
+  comment text
+  is_verified_purchase boolean [default: false]
+  created_at timestamp [default: `CURRENT_TIMESTAMP`]
+  updated_at timestamp [default: `CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP`]
+
+  indexes {
+    idx_user_id [name: 'idx_user_id']
+    idx_product_id [name: 'idx_product_id']
+    idx_rating [name: 'idx_rating']
+    idx_created_at [name: 'idx_created_at']
+    (user_id, product_id) [unique, name: 'idx_user_product']
+  }
+
+  Note: 'Product reviews'
+}
+
+Table user_sessions {
+  id varchar(128) [pk]
+  user_id int
+  ip_address varchar(45)
+  user_agent text
+  payload text
+  last_activity timestamp [default: `CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP`]
+  created_at timestamp [default: `CURRENT_TIMESTAMP`]
+
+  indexes {
+    idx_user_id [name: 'idx_user_id']
+    idx_last_activity [name: 'idx_last_activity']
+  }
+
+  Note: 'User session data'
+}
+
+Table audit_logs {
+  id bigint [pk, increment]
+  table_name varchar(64) [not null]
+  record_id int [not null]
+  action varchar [not null, note: 'ENUM: INSERT, UPDATE, DELETE']
+  old_values json
+  new_values json
+  user_id int
+  ip_address varchar(45)
+  user_agent text
+  created_at timestamp [default: `CURRENT_TIMESTAMP`]
+
+  indexes {
+    (table_name, record_id) [name: 'idx_table_record']
+    idx_action [name: 'idx_action']
+    idx_user_id [name: 'idx_user_id']
+    idx_created_at [name: 'idx_created_at']
+  }
+
+  Note: 'Audit trail for data changes'
+}
+
+// Relationships
+Ref: categories.parent_id > categories.id [delete: set null]
+Ref: products.category_id > categories.id [delete: restrict]
+Ref: orders.user_id > users.id [delete: cascade]
+Ref: order_items.order_id > orders.id [delete: cascade]
+Ref: order_items.product_id > products.id [delete: restrict]
+Ref: reviews.user_id > users.id [delete: cascade]
+Ref: reviews.product_id > products.id [delete: cascade]
+Ref: user_sessions.user_id > users.id [delete: cascade]
+Ref: audit_logs.user_id > users.id [delete: set null]
